@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "flow": {
+      "type": "local",
+      "command": [
+        "node",
+        "D:\\dev\\media-mcp\\packages\\server\\dist\\index.js"
+      ],
+      "enabled": true,
+      "environment": {
+        "MEDIA_MCP_HOME": "C:\\Users\\Quang\\.media-mcp"
+      }
+    }
+  }
+}

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Flow MCP Bridge</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #1f1f1f;
+        --muted: #5f6368;
+        --line: #dadce0;
+        --accent: #1a73e8;
+        --ok: #188038;
+        --warn: #b06000;
+        --err: #d93025;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #202124;
+          --fg: #e8eaed;
+          --muted: #9aa0a6;
+          --line: #3c4043;
+          --accent: #8ab4f8;
+          --ok: #81c995;
+          --warn: #fdd663;
+          --err: #f28b82;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        width: 340px;
+        margin: 0;
+        padding: 14px;
+        font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      h1 { font-size: 14px; margin: 0 0 2px; }
+      .sub { color: var(--muted); font-size: 11px; margin-bottom: 12px; }
+      .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0; }
+      .status { display: flex; align-items: center; gap: 6px; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+      .dot.connected { background: var(--ok); }
+      .dot.connecting { background: var(--warn); }
+      .dot.unauthorized, .dot.unpaired { background: var(--err); }
+      .dot.disconnected { background: var(--err); }
+      button {
+        font: inherit;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--fg);
+        cursor: pointer;
+      }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      input {
+        font: inherit;
+        width: 100%;
+        padding: 6px 8px;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--fg);
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        margin: 10px 0;
+      }
+      .kv { display: grid; grid-template-columns: 92px 1fr; gap: 4px 8px; font-size: 12px; }
+      .kv dt { color: var(--muted); }
+      .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .msg { font-size: 11px; color: var(--muted); min-height: 15px; margin-top: 6px; }
+      .msg.error { color: var(--err); }
+      .msg.ok { color: var(--ok); }
+      .muted { color: var(--muted); font-size: 11px; }
+      code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <h1>Flow MCP Bridge</h1>
+    <div class="sub">MCP ⇄ Chrome ⇄ flow.google.com</div>
+
+    <div class="card">
+      <div class="row">
+        <div class="status"><span id="dot" class="dot"></span><span id="state">checking…</span></div>
+        <span class="muted" id="version"></span>
+      </div>
+      <div class="row">
+        <button id="pair" class="primary">Pair with MCP server</button>
+        <button id="reconnect">Reconnect</button>
+      </div>
+      <div class="msg" id="pairMsg"></div>
+    </div>
+
+    <div class="card">
+      <dl class="kv">
+        <dt>Account</dt><dd id="account">—</dd>
+        <dt>Tab</dt><dd id="tab">—</dd>
+        <dt>Project</dt><dd id="project">—</dd>
+        <dt>Replay plan</dt><dd id="plan">DOM only</dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <label class="muted" for="subdir">Downloads subfolder (under your Chrome downloads folder)</label>
+      <div class="row" style="margin-top: 6px">
+        <input id="subdir" placeholder="Flow" />
+        <button id="save">Save</button>
+      </div>
+      <div class="msg" id="saveMsg"></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin: 0">
+        <div>
+          <div>Trusted clicks</div>
+          <div class="muted">Uses the debugger permission when Flow ignores synthetic clicks</div>
+        </div>
+        <button id="debugger">Enable</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="openFlow" style="width: 100%">Open flow.google.com</button>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
