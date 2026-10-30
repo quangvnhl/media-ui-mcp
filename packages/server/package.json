@@ -1,6 +1,6 @@
 {
   "name": "media-ui-mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Shared local MCP daemon and Chrome bridge for Google Flow",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/quangvnhl/media-ui-mcp.git", "directory": "packages/server" },

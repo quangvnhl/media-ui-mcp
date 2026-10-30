@@ -31,6 +31,7 @@ function copyStatic() {
   for (const file of ["manifest.json", "popup.html", "offscreen.html"]) {
     fs.copyFileSync(file, path.join(outdir, file));
   }
+  fs.cpSync("icons", path.join(outdir, "icons"), { recursive: true });
 }
 
 copyStatic();
@@ -39,7 +40,7 @@ if (watch) {
   const ctx = await context(options);
   await ctx.watch();
   const watcher = fs.watch(".", { recursive: true }, (event, filename) => {
-    if (filename && (filename.endsWith(".html") || filename.endsWith("manifest.json"))) copyStatic();
+    if (filename && (filename.endsWith(".html") || filename.endsWith("manifest.json") || /^icons[\\/]/.test(filename))) copyStatic();
   });
   process.on("SIGINT", () => {
     watcher.close();

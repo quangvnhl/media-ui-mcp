@@ -5,13 +5,10 @@
       "type": "local",
       "command": [
         "node",
-        "D:\\dev\\media-ui-mcp\\packages\\server\\dist\\index.js",
+        "./packages/server/dist/index.js",
         "--stdio"
       ],
-      "enabled": true,
-      "environment": {
-        "MEDIA_MCP_HOME": "C:\\Users\\Quang\\.media-mcp"
-      }
+      "enabled": true
     }
   }
 }

@@ -1,9 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Flow MCP Bridge",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Local bridge that lets AI agents drive Google Flow (flow.google.com) through your own signed-in session.",
   "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "permissions": [
     "storage",
     "tabs",
@@ -27,6 +33,10 @@
     "service_worker": "background.js"
   },
   "action": {
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    },
     "default_popup": "popup.html",
     "default_title": "Flow MCP Bridge"
   },

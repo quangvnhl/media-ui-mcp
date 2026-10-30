@@ -2,6 +2,10 @@
 
 Audience: an AI agent with the `flow_*` tools available. Read this once, then follow the loops below.
 
+Client connection setup: [CLIENTS.md](./CLIENTS.md). It includes configuration examples and a portable instruction block for other agent hosts.
+
+Examples use synthetic names and placeholders. Never copy live account details, project/media IDs, file paths or session output into public documentation or fixtures.
+
 Tool schemas: [`TOOLS.md`](./TOOLS.md). Failures: [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md).
 
 ## 1. Mental model
@@ -31,7 +35,7 @@ Then identify the project:
 
 Response: `{ "projects": [{ "projectId", "name", "url", "accountIndex" }], "accountIndex", "pageUrl", "hasMore", "nextCursor", "warnings" }`.
 
-Names come from `.project-title-label` within each `.projects-grid-item`, not thumbnail alt text. Preserve custom names and default names such as `Tháng 10 30 - 00:26`. Prefer exact matches after Unicode normalization, trimming and case folding. Use partial matches only to propose candidates. Confirm with the human when names match multiple projects; IDs are the identity. `name: null` means the title could not be read. `hasMore: null` means completeness is unknown, so absence is not proof that a project does not exist. Do not create a replacement project on this basis. Cursors currently return `E_UNSUPPORTED`.
+Names come from `.project-title-label` within each `.projects-grid-item`, not thumbnail alt text. Preserve custom names and default date-based names, illustrated by the fabricated `Tháng 1 02 - 03:04`. Prefer exact matches after Unicode normalization, trimming and case folding. Use partial matches only to propose candidates. Confirm with the human when names match multiple projects; IDs are the identity. `name: null` means the title could not be read. `hasMore: null` means completeness is unknown, so absence is not proof that a project does not exist. Do not create a replacement project on this basis. Cursors currently return `E_UNSUPPORTED`.
 
 ## Shared daemon connection
 
@@ -63,12 +67,12 @@ Rules:
 
 ### 3.2 Generate N images
 
-`count` is accepted but the UI lane submits one prompt per call. For N images, call `flow_image_generate` N times sequentially (not in parallel), each with its own jobId and poll. Vary prompts per call if the human wants distinct results.
+`count` accepts 1–4. The current trusted-input implementation selects the composer xN setting and also dispatches Enter N times, so exact batch behavior for counts above one is not verified. For an exact N images, use N sequential `count: 1` jobs (not parallel), polling and downloading each before continuing. Vary prompts if the human wants distinct results.
 
 ### 3.3 Create a project and fill it
 
 ```
-flow_project_create { name: "CKW" }
+flow_project_create { name: "Demo Project" }
   -> { projectId, url, name, accountIndex }
 flow_image_generate { prompt, projectId }
 ...
@@ -82,7 +86,7 @@ If `name` comes back prefixed by Flow, keep the returned `projectId` and pass `p
 flow_accounts_list {}
   -> { accounts: [{ index, email, displayName, signedIn, tabId, active }], selectedIndex }
 
-flow_account_select { index: 1 }          # or { email: "x@y.z", verify: true }
+flow_account_select { index: 0 }          # or { email: "user@example.com", verify: true }
 ```
 
 Pinned accounts apply to every later call that accepts `accountIndex`. Generation fails with `E_ACCOUNT_MISMATCH` rather than silently using the wrong Google identity — do not retry with a different account without asking the human.

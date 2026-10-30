@@ -5,6 +5,13 @@ dist/
 *.tsbuildinfo
 .DS_Store
 .env
+.env.*
+!.env.example
+.media-mcp/
+**/discovery-capture*.json
+*.har
+*.tgz
+out/
 
 .opencode/
 .claude/

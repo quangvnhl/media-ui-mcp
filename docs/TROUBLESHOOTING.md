@@ -57,7 +57,7 @@ If you see `strategy: "dom"` with the warning `Submitted with trusted CDP input`
 Flow's generation call is a Google `batchexecute` RPC:
 
 ```
-POST https://flow.google.com/u/1/_/AiSandboxAngularFrontend/data/batchexecute?rpcids=nzlxg&…
+POST https://flow.google.com/u/<account-index>/_/AiSandboxAngularFrontend/data/batchexecute?rpcids=<rpc-id>&…
 body: f.req=<url-encoded nested JSON>&at=<csrf token>&…
 ```
 
@@ -92,7 +92,7 @@ Consequences:
 ## Known limits
 
 - `referenceImages` → `E_UNSUPPORTED`.
-- `count > 1` submits once; loop the call.
+- `count > 1` sets xN and dispatches Enter N times in the current trusted-input implementation; exact batch behavior is unverified. Prefer sequential `count: 1` jobs for exact counts.
 - `flow_media_list` cannot report per-image prompt/model/date; Flow does not expose them in the DOM.
 - Project rename is best-effort; Flow may re-prefix the title.
 - `flow_projects_list` accepts `cursor` but Flow currently returns a single page.

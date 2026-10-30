@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
 const entry = path.join(root, "packages", "server", "dist", "index.js");
-const home = path.join(os.homedir(), ".media-mcp");
 const writeOpencode = process.argv.includes("--write-opencode");
 const opencodePath = path.join(root, "opencode.json");
 
@@ -18,11 +16,8 @@ const mcp = {
   mcp: {
     flow: {
       type: "local",
-      command: ["node", entry, "--stdio"],
-      enabled: true,
-      environment: {
-        MEDIA_MCP_HOME: home
-      }
+      command: ["node", writeOpencode ? "./packages/server/dist/index.js" : entry, "--stdio"],
+      enabled: true
     }
   }
 };

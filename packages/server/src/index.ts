@@ -12,7 +12,7 @@ import { registerTools } from "./tools.js";
 
 async function main(): Promise<void> {
   if (process.argv.includes("--version")) {
-    console.error("media-ui-mcp 0.2.1");
+    console.error("media-ui-mcp 0.2.2");
     return;
   }
   const config = loadConfig();
@@ -43,7 +43,7 @@ async function main(): Promise<void> {
   const servers = new Set<McpServer>();
   const sessions = new Map<string, StreamableHTTPServerTransport>();
   const createServer = (): McpServer => {
-    const server = new McpServer({ name: "media-ui-mcp", version: "0.2.1" });
+    const server = new McpServer({ name: "media-ui-mcp", version: "0.2.2" });
     registerTools(server, bridge, jobs, config);
     servers.add(server);
     return server;

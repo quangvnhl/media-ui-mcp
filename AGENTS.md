@@ -54,6 +54,9 @@ Run one daemon on fixed port 61899 (`npx media-ui-mcp` after publication, or `np
 ## Security
 
 - Never commit `~/.media-mcp/token`, `~/.media-mcp/discovery-capture.json`, or `discovery-capture.json` copies.
+- Documentation, examples and test fixtures must use synthetic data. Never copy real emails, project names or IDs, account selections, media/job/tab IDs, session timestamps, download filenames, personal paths or live tool output into repository files.
+- Use `example.com` email addresses, obvious placeholder IDs and portable relative paths. Check fixtures and generated configurations as well as Markdown before publishing. Treat registration output containing absolute paths as private.
+- Run `npm run check:privacy` before publishing. It checks current tracked/untracked non-ignored files, not Git history or published artifacts; manually review names and context as well.
 - Do not print captured `at` tokens, cookies, or full request bodies into chat or logs.
 - Do not enable `allowSpend` or change a human's download directory without explicit instruction.
 - Do not add remote endpoints. The bridge is loopback-only by design (`127.0.0.1`, token-checked WS handshake).

@@ -1,5 +1,7 @@
 # Tool reference
 
+All examples are synthetic. IDs, timestamps, account indices, byte counts and filenames below are illustrative, not captured session data. Paths such as `<download-directory>` and `<media-mcp-home>` are placeholders for local absolute paths; URLs use `<account-index>` instead of a real account selection.
+
 All tools return a JSON object serialized as text. Errors set `isError: true` and return:
 
 ```json
@@ -19,21 +21,21 @@ Input: none.
 ```json
 {
   "connectionState": "connected",        // connected | disconnected
-  "extensionVersion": "0.1.0",
+  "extensionVersion": "0.2.2",
   "extensionId": "…",
   "protocolVersion": 1,
   "paired": true,
-  "connectedAt": "2026-10-29T16:26:25.464Z",
+  "connectedAt": "2000-01-01T00:00:00.000Z",
   "lastMessageAt": "…",
   "pendingCalls": 0,
   "extensionCapabilities": null,
   "extension": {
     "connected": true,
-    "tabId": 863198723,
-    "url": "https://flow.google.com/u/1/project/<projectId>",
-    "accountIndex": 1,
-    "email": "code2829@gmail.com",
-    "projectId": "<projectId>",
+    "tabId": 42,
+    "url": "https://flow.google.com/u/<account-index>/project/<project-id>",
+    "accountIndex": 0,
+    "email": "user@example.com",
+    "projectId": "<project-id>",
     "pageReady": true,
     "hooksInstalled": true,
     "capabilities": {
@@ -46,7 +48,7 @@ Input: none.
     "downloadDir": null,
     "downloadSubdir": "Flow",
     "manifest": {
-      "version": "0.1.0",
+      "version": "0.2.2",
       "permissions": ["storage", "tabs", "downloads", "scripting", "alarms", "offscreen", "debugger"],
       "optionalPermissions": []
     }
@@ -68,12 +70,12 @@ Input: none.
 {
   "accounts": [
     {
-      "index": 1,
-      "email": "code2829@gmail.com",
-      "displayName": "…",
+      "index": 0,
+      "email": "user@example.com",
+      "displayName": "Example User",
       "signedIn": true,
-      "url": "https://flow.google.com/u/1/project/…",
-      "tabId": 863198723,
+      "url": "https://flow.google.com/u/<account-index>/project/<project-id>",
+      "tabId": 42,
       "active": true
     }
   ],
@@ -94,7 +96,7 @@ Pins the account used by every later call.
 | `verify` | boolean | no | re-check the signed-in identity before storing |
 
 ```json
-{ "index": 1, "email": "code2829@gmail.com", "verified": true }
+{ "index": 0, "email": "user@example.com", "verified": true }
 ```
 
 Errors: `E_NOT_FOUND` when neither index nor matching email exists.
@@ -103,7 +105,7 @@ Errors: `E_NOT_FOUND` when neither index nor matching email exists.
 
 ## flow_models_list
 
-Read-only. Reads selectable models/aspect ratios from the live UI.
+Read-only. Reports image models/aspect ratios using live UI detection and configured fallbacks. Returned model names are not a guarantee of account entitlement; inspect generation warnings if a requested setting is unavailable.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
@@ -134,15 +136,15 @@ Read-only. List projects for the pinned (or given) account.
 {
   "projects": [
     {
-      "projectId": "f8854ec6-3c3c-418a-a441-a2829afa70f1",
-      "name": "CKW",
-      "url": "https://flow.google.com/u/1/project/f8854ec6-…",
-      "accountIndex": 1,
+      "projectId": "<project-id>",
+      "name": "Demo Project",
+      "url": "https://flow.google.com/u/<account-index>/project/<project-id>",
+      "accountIndex": 0,
       "updatedAt": null
     }
   ],
-  "accountIndex": 1,
-  "pageUrl": "https://flow.google.com/u/1/",
+  "accountIndex": 0,
+  "pageUrl": "https://flow.google.com/u/<account-index>/",
   "hasMore": null,
   "nextCursor": null,
   "warnings": ["Projects were collected from rendered cards with bounded scrolling. Completeness is not verified; absence from this list does not prove a project does not exist."]
@@ -151,7 +153,7 @@ Read-only. List projects for the pinned (or given) account.
 
 Note: this navigates the worker tab to the account home if it is currently on a project page.
 
-Each `.projects-grid-item` supplies its URL from `a.project-thumbnail-container[href]` and its name from `.project-title-label`. Names are preserved, including default names such as `Tháng 10 30 - 00:26`, single-character names and duplicate names with different project IDs. Thumbnail descriptions and action labels are never used as title fallbacks. Missing titles return `name: null` with a warning. `updatedAt` is not inferred from a date-based name.
+Each `.projects-grid-item` supplies its URL from `a.project-thumbnail-container[href]` and its name from `.project-title-label`. Names are preserved, including default names such as the fabricated `Tháng 1 02 - 03:04`, single-character names and duplicate names with different project IDs. Thumbnail descriptions and action labels are never used as title fallbacks. Missing titles return `name: null` with a warning. `updatedAt` is not inferred from a date-based name.
 
 Collection waits for stable titles and scrolls the list for up to 12 seconds, retaining previously seen cards if the UI virtualizes them. Scroll positions are restored afterward. `hasMore: true` means collected results exceeded `limit`; `null` means completeness is unknown. No pagination cursor is fabricated. Resolve duplicate names by ID rather than selecting the first match. Existing project links without readable cards produce `E_UI_DRIFT`; no cards produce an empty result with a loading/empty-state warning.
 
@@ -165,7 +167,7 @@ Collection waits for stable titles and scrolls the list for up to 12 seconds, re
 | `accountIndex` | int \| null | no | |
 
 ```json
-{ "projectId": "…", "url": "https://flow.google.com/u/1/project/…", "name": "CKW", "accountIndex": 1 }
+{ "projectId": "<project-id>", "url": "https://flow.google.com/u/<account-index>/project/<project-id>", "name": "Demo Project", "accountIndex": 0 }
 ```
 
 Errors: `E_TIMEOUT` if the project page does not open within 40 s.
@@ -183,7 +185,7 @@ Opens or focuses the project tab. Use it to recover from `E_NO_TAB` / `E_PAGE_NO
 | `focus` | boolean | no | bring the tab to the foreground |
 
 ```json
-{ "tabId": 863198723, "url": "https://flow.google.com/u/1/project/…", "projectId": "…", "accountIndex": 1 }
+{ "tabId": 42, "url": "https://flow.google.com/u/<account-index>/project/<project-id>", "projectId": "<project-id>", "accountIndex": 0 }
 ```
 
 ---
@@ -200,21 +202,21 @@ Read-only. Media currently rendered in a project.
 
 ```json
 {
-  "projectId": "…",
+  "projectId": "<project-id>",
   "items": [
     {
-      "mediaId": "ANqvLOa1X7N0…",
+      "mediaId": "<media-id>",
       "kind": "image",
-      "url": "https://flow.google.com/asb/ANqvLOa1X7N0…=s512-rw?authuser=1",
-      "thumbUrl": "https://flow.google.com/asb/…=s512-rw?authuser=1",
+      "url": "https://flow.google.com/asb/<media-id>=s512-rw?authuser=<account-index>",
+      "thumbUrl": "https://flow.google.com/asb/<media-id>=s512-rw?authuser=<account-index>",
       "prompt": null,
       "model": null,
       "createdAt": null,
-      "projectId": "…"
+      "projectId": "<project-id>"
     }
   ],
-  "pageUrl": "https://flow.google.com/u/1/project/…",
-  "capturedAt": "2026-10-29T16:21:30.883Z"
+  "pageUrl": "https://flow.google.com/u/<account-index>/project/<project-id>",
+  "capturedAt": "2000-01-01T00:00:00.000Z"
 }
 ```
 
@@ -238,21 +240,21 @@ Submits a prompt and returns immediately. Single-flight: submissions are seriali
 | `accountIndex` | int \| null | no | | |
 | `model` | string 1..80 | no | page default | from `flow_models_list` |
 | `aspectRatio` | string ≤12 | no | page default | from `flow_models_list.aspects` |
-| `count` | int 1..4 | no | 1 | UI lane submits one image per call; call again for more |
+| `count` | int 1..4 | no | 1 | exact batch behavior above 1 is unverified; prefer sequential `count: 1` jobs |
 | `strategy` | `"auto"` \| `"api"` \| `"dom"` | no | `"auto"` | keep `auto` |
 | `timeoutMs` | int 5000..600000 | no | 120000 | page-ready wait budget |
 | `referenceImages` | string[] max 4, ≤4096 each | no | | **unimplemented**, returns `E_UNSUPPORTED` |
 
 ```json
 {
-  "jobId": "3714af68-41ec-4141-8f51-81c9e19e0a93",
+  "jobId": "<job-id>",
   "status": "submitted",
-  "projectId": "f8854ec6-…",
-  "projectName": "Google Flow – CKW",
-  "accountIndex": 1,
+  "projectId": "<project-id>",
+  "projectName": "Demo Project",
+  "accountIndex": 0,
   "strategy": "dom",
   "expectedCount": 1,
-  "baselineMediaIds": ["ANqvLOa1…", "ANqvLOav…"],
+  "baselineMediaIds": ["<existing-media-id>"],
   "warnings": [
     "Submitted with trusted CDP input (debugger permission)"
   ],
@@ -272,17 +274,17 @@ Submits a prompt and returns immediately. Single-flight: submissions are seriali
 
 ```json
 {
-  "jobId": "3714af68-…",
+  "jobId": "<job-id>",
   "status": "completed",              // submitted | generating | completed | failed | timeout
-  "projectId": "…",
-  "projectName": "Google Flow – CKW",
-  "accountIndex": 1,
+  "projectId": "<project-id>",
+  "projectName": "Demo Project",
+  "accountIndex": 0,
   "prompt": "Flat vector avatar of …",
   "expectedCount": 1,
-  "mediaIds": ["10642a41-5a3d-41c3-97aa-8b87e68769dd"],
+  "mediaIds": ["<new-media-id>"],
   "error": null,
-  "submittedAt": "2026-10-29T16:26:41.435Z",
-  "updatedAt": "2026-10-29T16:27:07.430Z",
+  "submittedAt": "2000-01-01T00:00:00.000Z",
+  "updatedAt": "2000-01-01T00:01:00.000Z",
   "hint": "Call flow_media_download for each mediaId."
 }
 ```
@@ -310,13 +312,13 @@ Downloads through Chrome (uses the tab's cookies), then optionally moves the fil
 
 ```json
 {
-  "mediaId": "10642a41-5a3d-41c3-97aa-8b87e68769dd",
-  "path": "C:\\Users\\Quang\\Downloads\\Flow\\CKW\\ckw-avatar-cdp.jpg",
-  "filename": "ckw-avatar-cdp.jpg",
-  "bytes": 80929,
+  "mediaId": "<new-media-id>",
+  "path": "<download-directory>/Flow/Demo Project/example-image.jpg",
+  "filename": "example-image.jpg",
+  "bytes": 12345,
   "mime": "image/jpeg",
-  "moved": true,
-  "downloadId": 399
+  "moved": false,
+  "downloadId": 7
 }
 ```
 
@@ -366,18 +368,18 @@ Input: none.
 
 ```json
 {
-  "path": "C:\\Users\\Quang\\.media-mcp\\discovery-capture.json",
+  "path": "<media-mcp-home>/discovery-capture.json",
   "data": {
     "export": {
       "exportedAt": "…",
-      "accountIndex": 1,
-      "pageUrl": "https://flow.google.com/u/1/project/…",
-      "projectId": "…",
+      "accountIndex": 0,
+      "pageUrl": "https://flow.google.com/u/<account-index>/project/<project-id>",
+      "projectId": "<project-id>",
       "apiHosts": ["flow.google.com"],
       "recaptchaSiteKeys": [],
       "templates": [],
       "capturedResponses": [],
-      "rpc": [{ "url": "https://flow.google.com/u/1/_/AiSandboxAngularFrontend/data/batchexecute?rpcids=nzlxg…", "body": "f.req=…", "at": "…" }]
+      "rpc": [{ "url": "https://flow.google.com/u/<account-index>/_/AiSandboxAngularFrontend/data/batchexecute?rpcids=<rpc-id>", "body": "<redacted>", "at": "<timestamp>" }]
     },
     "plan": null
   }
@@ -399,7 +401,7 @@ Reads settings when called with no arguments.
 | `allowSpend` | boolean | no | credits/spend gate; do not enable on the human's behalf |
 
 ```json
-{ "settings": { "downloadSubdir": "Flow", "defaultAccountIndex": 1, "allowSpend": false }, "homeDir": "C:\\Users\\Quang\\.media-mcp", "allowSpend": false }
+{ "settings": { "downloadSubdir": "Flow", "defaultAccountIndex": 0, "allowSpend": false }, "homeDir": "<media-mcp-home>", "allowSpend": false }
 ```
 
 With updates, returns `{ "settings": { … } }` only.
