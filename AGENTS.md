@@ -4,7 +4,7 @@ Operating rules for coding agents (and humans) working in this repository.
 
 ## What this is
 
-`media-mcp` is a monorepo of three workspaces:
+`media-ui-mcp` is a monorepo of three workspaces:
 
 | Workspace | Role |
 | --- | --- |
@@ -40,9 +40,9 @@ npm run build
 | --- | --- |
 | `packages/extension/src/**` | `npm run build:extension`, reload at `chrome://extensions`, F5 the Flow tab |
 | `packages/extension/manifest.json` | same as above; Chrome only applies permissions on full reload |
-| `packages/server/src/**`, `packages/shared/src/**` | `npm run build`, restart the MCP client (opencode or Claude Desktop) |
+| `packages/server/src/**`, `packages/shared/src/**` | `npm run build`, restart the shared daemon console, reconnect MCP clients |
 
-The server bundle is loaded once per MCP client session: tool changes are invisible until restart.
+Run one daemon on fixed port 61899 (`npx media-ui-mcp` after publication, or `npm start`). All agents use its `/mcp` endpoint or `--stdio` forwarding shim; never start separate bridges. Tool changes require a daemon restart. Port overrides and `--embed` are reserved for isolated tests.
 
 ## Flow-specific constraints
 

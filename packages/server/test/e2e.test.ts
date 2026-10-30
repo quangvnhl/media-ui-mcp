@@ -241,7 +241,7 @@ test("MCP server drives a Flow session end to end over the websocket bridge", { 
 
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [ENTRY],
+    args: [ENTRY, "--embed"],
     env: {
       ...process.env,
       MEDIA_MCP_HOME: home,
@@ -356,7 +356,7 @@ test("websocket bridge rejects a wrong pairing token", { timeout: 30_000 }, asyn
   const port = await freePort();
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [ENTRY],
+    args: [ENTRY, "--embed"],
     env: { ...process.env, MEDIA_MCP_HOME: home, MEDIA_MCP_PORT: String(port) },
     stderr: "pipe"
   });
@@ -386,7 +386,7 @@ test("websocket bridge rejects non-extension origins", { timeout: 30_000 }, asyn
   const port = await freePort();
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [ENTRY],
+    args: [ENTRY, "--embed"],
     env: { ...process.env, MEDIA_MCP_HOME: home, MEDIA_MCP_PORT: String(port) },
     stderr: "pipe"
   });

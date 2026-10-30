@@ -29,16 +29,20 @@ Then identify the project:
 { "name": "flow_projects_list", "arguments": {} }
 ```
 
-Response: `{ "projects": [{ "projectId", "name", "url", "accountIndex" }], "accountIndex", "pageUrl" }`.
+Response: `{ "projects": [{ "projectId", "name", "url", "accountIndex" }], "accountIndex", "pageUrl", "hasMore", "nextCursor", "warnings" }`.
 
-Match names case-insensitively. Flow sometimes stores a prefix (`"Google Flow – CKW"`), so prefer `contains` over equality, and confirm with the human when two projects are similar.
+Names come from `.project-title-label` within each `.projects-grid-item`, not thumbnail alt text. Preserve custom names and default names such as `Tháng 10 30 - 00:26`. Prefer exact matches after Unicode normalization, trimming and case folding. Use partial matches only to propose candidates. Confirm with the human when names match multiple projects; IDs are the identity. `name: null` means the title could not be read. `hasMore: null` means completeness is unknown, so absence is not proof that a project does not exist. Do not create a replacement project on this basis. Cursors currently return `E_UNSUPPORTED`.
+
+## Shared daemon connection
+
+Start one console with `npx media-ui-mcp` (after publication), or `npm start` from the repository. Every agent uses `127.0.0.1:61899`: HTTP MCP at `/mcp` with the token from `~/.media-mcp/token`, or `npx -y media-ui-mcp --stdio` as a forwarding shim. Keep the daemon console open. All sessions share jobs, the pinned account, and the extension. There is no automatic alternate port. Never print the token.
 
 ## 3. Canonical loops
 
 ### 3.1 Generate one image into an existing project
 
 ```
-flow_image_generate { prompt, projectId, projectName?, aspectRatio?, model? }
+flow_image_generate { prompt, projectId, projectName?, aspectRatio?, model?, count? }
   -> { jobId, status: "submitted", baselineMediaIds, warnings, ... }
 
 flow_job_status { jobId }        # every 3-5 s

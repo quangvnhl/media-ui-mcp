@@ -1,3 +1,5 @@
+import { DEFAULT_PORT } from "@media-mcp/shared";
+
 export interface ExtensionSettings {
   token: string | null;
   port: number | null;
@@ -19,7 +21,7 @@ export interface ReplayPlan {
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   token: null,
-  port: null,
+  port: DEFAULT_PORT,
   subdir: "Flow",
   accountIndex: null,
   emailByIndex: {},
@@ -33,12 +35,12 @@ const KEY = "settings";
 export async function getSettings(): Promise<ExtensionSettings> {
   const stored = await chrome.storage.local.get(KEY);
   const value = stored[KEY] as Partial<ExtensionSettings> | undefined;
-  return { ...DEFAULT_SETTINGS, ...(value ?? {}) };
+  return { ...DEFAULT_SETTINGS, ...(value ?? {}), port: DEFAULT_PORT };
 }
 
 export async function patchSettings(patch: Partial<ExtensionSettings>): Promise<ExtensionSettings> {
   const current = await getSettings();
-  const next = { ...current, ...patch };
+  const next = { ...current, ...patch, port: DEFAULT_PORT };
   await chrome.storage.local.set({ [KEY]: next });
   return next;
 }

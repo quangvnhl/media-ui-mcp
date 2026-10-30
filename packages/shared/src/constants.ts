@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 1;
-export const DEFAULT_PORT = 8765;
+export const DEFAULT_PORT = 61899;
 export const DEFAULT_DOWNLOAD_SUBDIR = "Flow";
 
 export const EXTENSION_ORIGIN_PREFIX = "chrome-extension://";

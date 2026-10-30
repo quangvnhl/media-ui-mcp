@@ -18,7 +18,7 @@ const mcp = {
   mcp: {
     flow: {
       type: "local",
-      command: ["node", entry],
+      command: ["node", entry, "--stdio"],
       enabled: true,
       environment: {
         MEDIA_MCP_HOME: home
@@ -54,7 +54,7 @@ if (writeOpencode) {
   console.log("\nClaude Desktop (claude_desktop_config.json):\n");
   console.log(
     JSON.stringify(
-      { mcpServers: { flow: { command: "node", args: [entry] } } },
+      { mcpServers: { flow: { command: "node", args: [entry, "--stdio"] } } },
       null,
       2
     )
@@ -62,5 +62,11 @@ if (writeOpencode) {
 }
 
 console.log(
-  "\nNext: run `npm run build`, load packages/extension/dist/extension as an unpacked extension, open the popup and click Pair."
+  "\nStart one daemon with `npx media-ui-mcp` (or `npm start` from this repo). Keep that console open. All agents and the extension use port 61899. Load packages/extension/dist/extension and click Pair."
 );
+console.log(JSON.stringify({ mcp: { flow: {
+  type: "remote",
+  url: "http://127.0.0.1:61899/mcp",
+  headers: { Authorization: "Bearer {env:MEDIA_MCP_TOKEN}" },
+  enabled: true
+} } }, null, 2));

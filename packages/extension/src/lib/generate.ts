@@ -84,7 +84,13 @@ export async function generateImages(params: GenerateParams): Promise<GenerateAc
 
   let result: PageSubmitResult;
   const trustedWarnings =
-    strategy === "api" ? null : await trustedSubmit(tabId, params.prompt, params.count ?? 1);
+    strategy === "api"
+      ? null
+      : await trustedSubmit(tabId, params.prompt, params.count ?? 1, {
+          model: params.model,
+          aspectRatio: params.aspectRatio,
+          count: params.count ?? 1
+        });
 
   if (trustedWarnings) {
     const info = await callContent<{ projectName: string | null }>(tabId, "info", undefined, 15_000).catch(
@@ -171,7 +177,8 @@ export async function generateImages(params: GenerateParams): Promise<GenerateAc
 async function trustedSubmit(
   tabId: number,
   prompt: string,
-  count: number
+  count: number,
+  settings: { model?: string; aspectRatio?: string; count?: number }
 ): Promise<string[] | null> {
   let granted = false;
   try {
@@ -192,6 +199,18 @@ async function trustedSubmit(
   }
 
   try {
+    const settingsResult = await callContent<{ warnings: string[] }>(
+      tabId,
+      "apply-settings",
+      {
+        model: settings.model,
+        aspectRatio: settings.aspectRatio,
+        count: settings.count
+      },
+      30_000
+    ).catch(() => ({ warnings: ["Could not apply model/aspect/count settings"] }));
+    const warnings = [...settingsResult.warnings];
+
     await callContent(tabId, "focus-prompt", undefined, 15_000);
     await sleep(300);
     await chrome.debugger.sendCommand(target, "Input.insertText", { text: prompt });
@@ -222,7 +241,7 @@ async function trustedSubmit(
       });
       await sleep(1500);
     }
-    return ["Submitted with trusted CDP input (debugger permission)"];
+    return [...warnings, "Submitted with trusted CDP input (debugger permission)"];
   } catch (error) {
     return null;
   } finally {

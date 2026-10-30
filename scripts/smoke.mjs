@@ -28,7 +28,7 @@ const outDir = path.resolve(arg("out", path.join(process.cwd(), "out")));
 const home = process.env.MEDIA_MCP_HOME || path.join(os.homedir(), ".media-mcp");
 const root = path.resolve(import.meta.dirname, "..");
 const entry = path.join(root, "packages", "server", "dist", "index.js");
-const port = Number(arg("port", process.env.MEDIA_MCP_PORT || "8765"));
+const port = 61899;
 
 if (!fs.existsSync(entry)) {
   console.error("Build the server first: npm run build");
@@ -52,8 +52,8 @@ function textOf(result) {
 
 const transport = new StdioClientTransport({
   command: process.execPath,
-  args: [entry],
-  env: { ...process.env, MEDIA_MCP_HOME: home, MEDIA_MCP_PORT: String(port) },
+  args: [entry, "--stdio"],
+  env: { ...process.env, MEDIA_MCP_HOME: home },
   stderr: "inherit"
 });
 

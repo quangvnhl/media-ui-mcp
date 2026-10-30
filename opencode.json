@@ -5,7 +5,8 @@
       "type": "local",
       "command": [
         "node",
-        "D:\\dev\\media-mcp\\packages\\server\\dist\\index.js"
+        "D:\\dev\\media-ui-mcp\\packages\\server\\dist\\index.js",
+        "--stdio"
       ],
       "enabled": true,
       "environment": {

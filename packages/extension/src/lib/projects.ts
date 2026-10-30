@@ -11,29 +11,36 @@ export interface ProjectsResponse {
   projects: ProjectInfo[];
   accountIndex: number | null;
   pageUrl: string;
+  warnings: string[];
+  hasMore: boolean | null;
+  nextCursor: null;
 }
 
 function accountHome(accountIndex: number | null): string {
   return accountIndex === null ? "https://flow.google.com/" : `https://flow.google.com/u/${accountIndex}/`;
 }
 
-async function scrapeProjectsWithRetry(tabId: number, attempts = 8): Promise<ProjectsResponse> {
-  let projects: ProjectInfo[] = [];
-  let pageUrl = "";
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const data = await callContent<{ projects: ProjectInfo[]; href: string }>(tabId, "projects", undefined, 20_000);
-    projects = data.projects;
-    pageUrl = data.href;
-    if (projects.length > 0) break;
-    await sleep(800);
+async function scrapeProjectList(tabId: number, limit: number): Promise<ProjectsResponse> {
+  const data = await callContent<{ projects: ProjectInfo[]; href: string; cardCount: number; projectLinkCount: number }>(tabId, "projects", { limit }, 16_000);
+  const { projects, cardCount, projectLinkCount } = data;
+  if (projects.length === 0 && (cardCount > 0 || projectLinkCount > 0)) {
+    throw Object.assign(new Error("Flow project cards could not be read; expected .projects-grid-item, a.project-thumbnail-container and .project-title-label"), { code: "E_UI_DRIFT" });
   }
-  return { projects, accountIndex: null, pageUrl };
+  const warnings = ["Projects were collected from rendered cards with bounded scrolling. Completeness is not verified; absence from this list does not prove a project does not exist."];
+  const unnamed = projects.filter((project) => project.name === null).length;
+  if (unnamed > 0) warnings.push(`${unnamed} project(s) have no readable title after waiting for rendering.`);
+  if (projects.length === 0) warnings.push("No project cards appeared; the page may be empty or still loading.");
+  return { projects, accountIndex: null, pageUrl: data.href, warnings, hasMore: null, nextCursor: null };
 }
 
 export async function listProjects(params: {
   accountIndex?: number | null;
   limit?: number;
+  cursor?: string;
 }): Promise<ProjectsResponse> {
+  if (params.cursor !== undefined) {
+    throw Object.assign(new Error("Project pagination cursors are not supported; only rendered cards can currently be listed."), { code: "E_UNSUPPORTED" });
+  }
   const accountIndex = await resolveAccountIndex(params.accountIndex);
   const tabId = await ensureWorkerTab(accountIndex);
   const current = await getTab(tabId);
@@ -44,10 +51,12 @@ export async function listProjects(params: {
     await sleep(1500);
   }
 
-  const result = await scrapeProjectsWithRetry(tabId);
   const limit = params.limit ?? 50;
+  const result = await scrapeProjectList(tabId, limit);
   return {
+    ...result,
     projects: result.projects.slice(0, limit),
+    hasMore: result.projects.length > limit ? true : result.hasMore,
     accountIndex,
     pageUrl: result.pageUrl
   };
@@ -109,10 +118,18 @@ export async function findOrCreateProject(
   accountIndex: number | null,
   desiredName: string
 ): Promise<{ projectId: string; name: string | null; created: boolean }> {
-  const wanted = desiredName.trim().toLowerCase();
+  const wanted = desiredName.normalize("NFC").trim().toLowerCase();
   const list = await listProjects({ accountIndex, limit: 100 });
-  const match = list.projects.find((project) => (project.name ?? "").trim().toLowerCase() === wanted);
+  const matches = list.projects.filter((project) => (project.name ?? "").normalize("NFC").trim().toLowerCase() === wanted);
+  if (matches.length > 1) {
+    throw Object.assign(new Error(`Multiple projects are named "${desiredName}"; select one by projectId.`), { code: "E_BAD_INPUT" });
+  }
+  const match = matches[0];
   if (match) return { projectId: match.projectId, name: match.name, created: false };
+
+  if (list.hasMore !== false || list.projects.some((project) => project.name === null)) {
+    throw Object.assign(new Error(`Cannot confirm that project "${desiredName}" is absent from the rendered project list; open it by URL or create it explicitly.`), { code: "E_PAGE_NOT_READY" });
+  }
 
   const created = await createProject({
     accountIndex,

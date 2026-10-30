@@ -20,6 +20,9 @@ Run these in order; stop at the first that fails.
 | `E_NOT_LOGGED_IN` | Google session expired in that tab | human signs in at `flow.google.com` |
 | `E_ACCOUNT_MISMATCH` | pinned `/u/N/` differs from the signed-in account | ask the human, then `flow_account_select { index }` |
 | `E_UI_DRIFT` on generate | Flow changed the composer/button markup | `flow_selftest`, report the failing check ids |
+| project name is a thumbnail description | old extension reads image alt text | rebuild and reload the extension, F5 Flow; names must come from `.project-title-label` inside `.projects-grid-item` |
+| `E_UI_DRIFT` on projects list | project links exist but expected cards cannot be parsed | verify `.projects-grid-item`, `a.project-thumbnail-container[href]`, `.project-title-label`; inspect `project-list-names` in `flow_selftest` on the list page |
+| project missing or `name: null` | bounded scrolling did not reach it or its title is still loading | read `warnings` and `hasMore`, retry after loading or use the known project URL; do not create a duplicate automatically |
 | generate returns warnings but no image appears | `trustedClicks: false` | reload the extension (`chrome://extensions`), confirm `debugger` in `status.extension.manifest.permissions` |
 | job stuck in `submitted` > 30 s | prompt never submitted (composer not focused, or throttled) | check warnings, re-submit once with a shorter prompt, then check `flow_media_list` |
 | `E_TIMEOUT` | no new media within 10 min | `flow_media_list { projectId, refresh: true }`; re-submit if absent |
@@ -75,7 +78,7 @@ Consequences:
 
 ## Ports and state
 
-- Server tries `8765`, then `8765-8774`; the chosen port is written to `~/.media-mcp/port`. The popup scans the same range.
+- One shared daemon listens only on `127.0.0.1:61899`. Start it once in a console with `npx media-ui-mcp` (after publication) or `npm start`. All agents use `/mcp` with the local Bearer token or the `--stdio` shim. The extension pairs only on 61899; there is no port scan or port-file discovery. If another application occupies the port, startup fails rather than moving ports.
 - `1008` WebSocket close = token mismatch. Delete `~/.media-mcp/token`, restart the server, re-pair.
 - `~/.media-mcp/jobs.json` survives restarts; jobs that were running are marked `failed` with `E_DISCONNECTED`.
 - Set `MEDIA_MCP_DEBUG=1` for verbose server logs (stderr only; stdout is the MCP protocol).

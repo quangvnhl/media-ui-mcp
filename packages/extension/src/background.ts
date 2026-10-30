@@ -1,4 +1,5 @@
 import {
+  DEFAULT_PORT,
   isFlowUrl,
   PROTOCOL_VERSION,
   parseAccountIndex,
@@ -119,13 +120,42 @@ async function connect(): Promise<void> {
   };
 }
 
+async function discoverServer(): Promise<{ port: number; token: string } | null> {
+  const port = DEFAULT_PORT;
+  try {
+      const response = await fetch(`http://127.0.0.1:${port}/pair`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      });
+      if (!response.ok) return null;
+      const pair = (await response.json()) as { token?: string };
+      if (pair.token) return { port, token: pair.token };
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function relocate(): Promise<boolean> {
+  const found = await discoverServer();
+  if (!found) return false;
+  await patchSettings({ port: found.port, token: found.token });
+  return true;
+}
+
 function scheduleReconnect(): void {
   if (runtime.reconnectTimer) return;
   const delay = Math.min(1000 * 2 ** runtime.reconnectAttempt, 10_000);
   runtime.reconnectAttempt += 1;
   runtime.reconnectTimer = setTimeout(() => {
     runtime.reconnectTimer = null;
-    void connect();
+    void (async () => {
+      if (runtime.reconnectAttempt % 3 === 0 && (await relocate())) {
+        runtime.reconnectAttempt = 0;
+      }
+      await connect();
+    })();
   }, delay);
 }
 
@@ -180,6 +210,7 @@ async function dispatch(method: string, params: Record<string, unknown>): Promis
       return listModels({ kind: params.kind === "video" ? "video" : "image" });
     case "projects.list":
       return listProjects({
+        cursor: typeof params.cursor === "string" ? params.cursor : undefined,
         accountIndex: typeof params.accountIndex === "number" ? params.accountIndex : undefined,
         limit: typeof params.limit === "number" ? params.limit : undefined
       });

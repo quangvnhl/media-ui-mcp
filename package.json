@@ -1,5 +1,5 @@
 {
-  "name": "media-mcp",
+  "name": "media-ui-mcp-repo",
   "version": "0.1.0",
   "private": true,
   "description": "MCP server + Chrome extension bridging AI agents to flow.google.com",
@@ -7,13 +7,13 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @media-mcp/server && npm run build -w @media-mcp/extension",
-    "build:server": "npm run build -w @media-mcp/server",
+    "build": "npm run build -w media-ui-mcp && npm run build -w @media-mcp/extension",
+    "build:server": "npm run build -w media-ui-mcp",
     "build:extension": "npm run build -w @media-mcp/extension",
-    "dev:server": "npm run dev -w @media-mcp/server",
+    "dev:server": "npm run dev -w media-ui-mcp",
     "dev:extension": "npm run dev -w @media-mcp/extension",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run test -w @media-mcp/server",
+    "test": "npm run test -w media-ui-mcp",
     "start": "node packages/server/dist/index.js",
     "register": "node scripts/register-mcp.mjs",
     "smoke": "node scripts/smoke.mjs"
@@ -23,6 +23,7 @@
     "@types/node": "^22.10.5",
     "@types/ws": "^8.5.13",
     "esbuild": "^0.24.2",
+    "linkedom": "^0.18.14",
     "typescript": "^5.7.3"
   },
   "engines": {

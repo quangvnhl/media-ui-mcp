@@ -127,7 +127,7 @@ Read-only. List projects for the pinned (or given) account.
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `accountIndex` | int \| null | no | overrides the pin for this call |
-| `cursor` | string | no | accepted for pagination; Flow currently returns the full first page |
+| `cursor` | string | no | not supported; supplying one returns `E_UNSUPPORTED` |
 | `limit` | int 1..100 | no | default 50 |
 
 ```json
@@ -135,18 +135,25 @@ Read-only. List projects for the pinned (or given) account.
   "projects": [
     {
       "projectId": "f8854ec6-3c3c-418a-a441-a2829afa70f1",
-      "name": "Google Flow – CKW",
+      "name": "CKW",
       "url": "https://flow.google.com/u/1/project/f8854ec6-…",
       "accountIndex": 1,
       "updatedAt": null
     }
   ],
   "accountIndex": 1,
-  "pageUrl": "https://flow.google.com/u/1/"
+  "pageUrl": "https://flow.google.com/u/1/",
+  "hasMore": null,
+  "nextCursor": null,
+  "warnings": ["Projects were collected from rendered cards with bounded scrolling. Completeness is not verified; absence from this list does not prove a project does not exist."]
 }
 ```
 
 Note: this navigates the worker tab to the account home if it is currently on a project page.
+
+Each `.projects-grid-item` supplies its URL from `a.project-thumbnail-container[href]` and its name from `.project-title-label`. Names are preserved, including default names such as `Tháng 10 30 - 00:26`, single-character names and duplicate names with different project IDs. Thumbnail descriptions and action labels are never used as title fallbacks. Missing titles return `name: null` with a warning. `updatedAt` is not inferred from a date-based name.
+
+Collection waits for stable titles and scrolls the list for up to 12 seconds, retaining previously seen cards if the UI virtualizes them. Scroll positions are restored afterward. `hasMore: true` means collected results exceeded `limit`; `null` means completeness is unknown. No pagination cursor is fabricated. Resolve duplicate names by ID rather than selecting the first match. Existing project links without readable cards produce `E_UI_DRIFT`; no cards produce an empty result with a loading/empty-state warning.
 
 ---
 
@@ -214,6 +221,10 @@ Read-only. Media currently rendered in a project.
 `prompt`, `model`, `createdAt` are usually `null`: Flow does not expose them in the DOM. Items are ordered newest-first when the UI renders newest-first; do not rely on ordering — compare ids.
 
 ---
+
+## Shared transport
+
+All tools are served by one daemon at `http://127.0.0.1:61899/mcp` with `Authorization: Bearer <local token>`. Run `npx media-ui-mcp` once in a console after publication, or `npm start` from the repo. Stdio clients use `--stdio` to forward requests to the same daemon. Every client shares its extension connection and job store.
 
 ## flow_image_generate
 

@@ -13,6 +13,7 @@ import {
   type ModelOption,
   type ProjectInfo
 } from "@media-mcp/shared";
+import { PROJECT_CARD_SELECTOR, mergeProjects, projectsFromCards } from "./projects.ts";
 
 const MAX_TEMPLATES = 12;
 const MAX_RESPONSES = 40;
@@ -611,44 +612,71 @@ function scrapeMedia(): MediaItem[] {
   });
 }
 
-const GENERIC_PROJECT_LABELS =
-  /^(mở dự án|open project|open|mở|xem dự án|tùy chọn|tùy chọn khác|more options|more|menu|\.\.\.)$/i;
-
-function projectNameFrom(anchor: HTMLAnchorElement): string | null {
-  const container = anchor.closest("div") ?? anchor;
-  const alt = container.querySelector<HTMLImageElement>("img[alt]")?.alt?.trim();
-  if (alt && !GENERIC_PROJECT_LABELS.test(alt)) return alt.slice(0, 120);
-
-  const label = (anchor.getAttribute("aria-label") ?? anchor.getAttribute("title") ?? "").trim();
-  if (label && !GENERIC_PROJECT_LABELS.test(label) && !/^https?:/i.test(label)) return label.slice(0, 120);
-
-  const heading = container.querySelector<HTMLElement>("h1, h2, h3, h4, [role='heading']");
-  const headingText = heading ? elementText(heading) : "";
-  if (headingText && !GENERIC_PROJECT_LABELS.test(headingText)) return headingText.slice(0, 120);
-
-  const lines = elementText(anchor)
-    .concat("\n", elementText(container))
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 1 && !GENERIC_PROJECT_LABELS.test(line));
-  return lines[0]?.slice(0, 120) ?? null;
+function scrapeProjects(): ProjectInfo[] {
+  return projectsFromCards(deepAll<Element>(PROJECT_CARD_SELECTOR), location.href);
 }
 
-function scrapeProjects(): ProjectInfo[] {
-  const result = new Map<string, ProjectInfo>();
-  const anchors = deepAll<HTMLAnchorElement>('a[href*="/project/"]');
-  for (const anchor of anchors) {
-    const projectId = parseProjectId(anchor.href);
-    if (!projectId || result.has(projectId)) continue;
-    result.set(projectId, {
-      projectId,
-      name: projectNameFrom(anchor),
-      url: anchor.href,
-      accountIndex: parseAccountIndex(anchor.href),
-      updatedAt: null
-    });
+function projectListScroller(card: Element): Element | null {
+  let scroller = card.parentElement;
+  while (scroller && !(scroller.scrollHeight > scroller.clientHeight && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) {
+    scroller = scroller.parentElement;
   }
-  return [...result.values()];
+  return scroller ?? document.scrollingElement;
+}
+
+async function collectProjects(limit: number): Promise<{
+  projects: ProjectInfo[];
+  href: string;
+  cardCount: number;
+  projectLinkCount: number;
+}> {
+  const collected = new Map<string, ProjectInfo>();
+  const deadline = Date.now() + 12_000;
+  const positions = new Map<Element, number>();
+  let stable = 0;
+  let previous = "";
+  let cardCount = 0;
+  let projectLinkCount = 0;
+  let initialized = false;
+  try {
+    while (Date.now() < deadline) {
+      const cards = deepAll<Element>(PROJECT_CARD_SELECTOR);
+      if (!initialized && cards.length > 0) {
+        initialized = true;
+        const scroller = projectListScroller(cards[0]!);
+        if (scroller) {
+          positions.set(scroller, scroller.scrollTop);
+          if (scroller.scrollTop > 0) {
+            scroller.scrollTop = 0;
+            await sleep(500);
+            continue;
+          }
+        }
+      }
+      cardCount = Math.max(cardCount, cards.length);
+      projectLinkCount = Math.max(projectLinkCount, deepAll<Element>('a[href*="/project/"]').length);
+      mergeProjects(collected, projectsFromCards(cards, location.href));
+      const projects = [...collected.values()];
+      const signature = JSON.stringify(projects.map((project) => [project.projectId, project.name]));
+      stable = signature === previous ? stable + 1 : 0;
+      previous = signature;
+      if (stable >= 2 && projects.length >= limit && projects.slice(0, limit).every((project) => project.name !== null)) break;
+      if (stable >= 2 && cards.length > 0) {
+        const scroller = projectListScroller(cards[0]!);
+        if (scroller && scroller.scrollHeight > scroller.clientHeight) {
+          if (!positions.has(scroller)) positions.set(scroller, scroller.scrollTop);
+          const before = scroller.scrollTop;
+          scroller.scrollTop += Math.max(1, Math.floor(scroller.clientHeight * 0.8));
+          if (scroller.scrollTop !== before) stable = 0;
+          else if (stable >= 4 && projects.every((project) => project.name !== null)) break;
+        } else if (stable >= 4 && projects.every((project) => project.name !== null)) break;
+      }
+      await sleep(500);
+    }
+    return { projects: [...collected.values()], href: location.href, cardCount, projectLinkCount };
+  } finally {
+    for (const [element, scrollTop] of positions) element.scrollTop = scrollTop;
+  }
 }
 
 function detectAspects(): string[] {
@@ -705,6 +733,327 @@ async function selectAspect(ratio: string | undefined): Promise<string[]> {
   }
   humanClick(chip);
   await sleep(300);
+  return warnings;
+}
+
+interface ComposerControl {
+  tag: string;
+  role: string;
+  aria: string;
+  title: string;
+  text: string;
+  cls: string;
+  x: number;
+  y: number;
+}
+
+function describeControl(el: HTMLElement): ComposerControl {
+  const rect = el.getBoundingClientRect();
+  return {
+    tag: el.tagName.toLowerCase(),
+    role: el.getAttribute("role") ?? "",
+    aria: el.getAttribute("aria-label") ?? "",
+    title: el.getAttribute("title") ?? "",
+    text: (elementText(el) || "").slice(0, 90),
+    cls: (el.getAttribute("class") ?? "").slice(0, 90),
+    x: Math.round(rect.x),
+    y: Math.round(rect.y)
+  };
+}
+
+function composerRoot(): HTMLElement | null {
+  const box = findPromptBox();
+  if (!box) return null;
+  let root: HTMLElement = box;
+  for (let depth = 0; depth < 8; depth += 1) {
+    const parent = root.parentElement;
+    if (!parent) break;
+    root = parent;
+    const controls = root.querySelectorAll('button, [role="button"], [role="combobox"]');
+    if (controls.length >= 3) break;
+  }
+  return root;
+}
+
+function visibleOverlayItems(): ComposerControl[] {
+  const roots = deepAll<HTMLElement>(".cdk-overlay-container, .cdk-overlay-pane, mat-menu, mat-dialog-container");
+  const source: ParentNode[] = roots.length > 0 ? roots : [document];
+  const seen = new Set<HTMLElement>();
+  const out: ComposerControl[] = [];
+  for (const root of source) {
+    for (const el of deepAll<HTMLElement>('[role="menuitem"], [role="option"], [role="radio"], button, li, mat-option', root)) {
+      if (seen.has(el) || !isVisible(el)) continue;
+      const text = elementText(el);
+      if (!text || text.length > 90) continue;
+      seen.add(el);
+      out.push(describeControl(el));
+    }
+  }
+  return out.slice(0, 60);
+}
+
+async function probeSettingsPanel(): Promise<unknown> {
+  const trigger = settingsTrigger();
+  if (!trigger) return { found: false, reason: "no settings trigger" };
+  const root = await ensurePanel();
+  if (!root) {
+    closeSettings();
+    return { found: false, reason: "panel did not open", trigger: describeControl(trigger) };
+  }
+  const items = deepAll<HTMLElement>("button, [role], li, span, div, mat-icon", root)
+    .filter(isVisible)
+    .filter((el) => {
+      const text = elementText(el);
+      return text.length > 0 && text.length <= 60;
+    })
+    .slice(0, 120)
+    .map(describeControl);
+  closeSettings();
+  await sleep(300);
+  return {
+    found: true,
+    trigger: describeControl(trigger),
+    panelClass: (root?.getAttribute("class") ?? "").slice(0, 120),
+    items
+  };
+}
+
+async function probeControls(): Promise<unknown> {
+  const root = composerRoot();
+  const box = findPromptBox();
+  if (!root || !box) return { found: false };
+  const controls = deepAll<HTMLElement>('button, [role="button"], [role="combobox"], [role="radio"], mat-select', root)
+    .filter(isVisible)
+    .map(describeControl);
+
+  const snapshot = new Set<Element>(deepAll<HTMLElement>("*"));
+  const triggers = deepAll<HTMLElement>("button, [role='button']", root).filter((el) => {
+    if (!isVisible(el) || isDisabled(el)) return false;
+    const label = [elementText(el), el.getAttribute("aria-label") ?? "", el.getAttribute("title") ?? ""].join(" ");
+    return /c\u00e0i \u0111\u1eb7t|settings|t\u00f9y ch\u1ecdn|tu\u1ef3 ch\u1ecdn|k\u00edch ho\u1ea1t/i.test(label);
+  });
+
+  const panels: { trigger: ComposerControl; appeared: ComposerControl[]; panelText: string }[] = [];
+  for (const trigger of triggers.slice(0, 2)) {
+    const before = new Set<Element>(deepAll<HTMLElement>("*"));
+    humanClick(trigger);
+    await sleep(1400);
+    const appeared = deepAll<HTMLElement>("button, [role], li, span, div")
+      .filter((el) => !before.has(el) && isVisible(el))
+      .filter((el) => {
+        const text = elementText(el);
+        return text.length > 0 && text.length <= 60;
+      })
+      .slice(0, 80)
+      .map(describeControl);
+    const panelRoot = deepAll<HTMLElement>("[class*='settings'], [class*='Settings'], mat-bottom-sheet, mat-dialog-container, .cdk-overlay-pane")
+      .filter(isVisible)
+      .map((el) => ({ cls: (el.getAttribute("class") ?? "").slice(0, 120), text: elementText(el).slice(0, 300) }))
+      .slice(0, 6);
+    panels.push({ trigger: describeControl(trigger), appeared, panelText: JSON.stringify(panelRoot) });
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+    await sleep(500);
+  }
+  snapshot.clear();
+  return { found: true, box: describeControl(box), root: { tag: root.tagName.toLowerCase(), cls: (root.getAttribute("class") ?? "").slice(0, 90) }, controls, panels };
+}
+
+
+const SETTINGS_TRIGGER_RE = /c\u00e0i \u0111\u1eb7t|k\u00edch ho\u1ea1t|settings/i;
+
+interface SettingsRequest {
+  model?: string;
+  aspectRatio?: string;
+  count?: number;
+}
+
+interface SettingsState {
+  text: string;
+  model: string | null;
+  aspectIcon: string | null;
+  count: number | null;
+}
+
+function normalizeText(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function settingsTrigger(): HTMLElement | null {
+  const scope = composerRoot() ?? document;
+  const buttons = deepAll<HTMLElement>('button, [role="button"]', scope).filter(
+    (el) => isVisible(el) && !isDisabled(el)
+  );
+  const rank = (el: HTMLElement): number => {
+    const cls = el.getAttribute("class") ?? "";
+    const aria = el.getAttribute("aria-label") ?? "";
+    const text = elementText(el);
+    let score = 0;
+    if (cls.includes("settings-trigger-button")) score += 4;
+    if (SETTINGS_TRIGGER_RE.test(aria)) score += 2;
+    if (text === "tune") score += 2;
+    if (/\bx\d+\b|crop_/i.test(text)) score += 3;
+    return score;
+  };
+  const ranked = buttons
+    .map((el) => ({ el, score: rank(el) }))
+    .filter((entry) => entry.score >= 2)
+    .sort((a, b) => b.score - a.score);
+  return ranked[0]?.el ?? null;
+}
+
+function readSettingsState(el: HTMLElement | null): SettingsState {
+  const text = el ? elementText(el) : "";
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const countMatch = /\bx\s*(\d+)\b/i.exec(text);
+  const aspectMatch = /crop_[a-z0-9_]+/i.exec(text);
+  return {
+    text: text.replace(/\s+/g, " ").trim(),
+    model: lines[0] ?? null,
+    aspectIcon: aspectMatch ? aspectMatch[0] : null,
+    count: countMatch ? Number(countMatch[1]) : null
+  };
+}
+
+function settingsPanel(): HTMLElement | null {
+  return deepAll<HTMLElement>(".settings-content-overlay, .settings-content").find((el) => isVisible(el)) ?? null;
+}
+
+function closeSettings(): void {
+  if (!settingsPanel()) return;
+  const trigger = settingsTrigger();
+  if (trigger) humanClick(trigger);
+}
+
+async function ensurePanel(): Promise<HTMLElement | null> {
+  let panel = settingsPanel();
+  if (panel) return panel;
+  const trigger = settingsTrigger();
+  if (!trigger) return null;
+  humanClick(trigger);
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await sleep(250);
+    panel = settingsPanel();
+    if (panel) return panel;
+  }
+  return null;
+}
+
+function toggleGroups(panel: HTMLElement): HTMLElement[] {
+  return deepAll<HTMLElement>("mat-button-toggle-group", panel).filter(isVisible);
+}
+
+function togglesIn(group: HTMLElement): HTMLElement[] {
+  return deepAll<HTMLElement>("mat-button-toggle", group).filter(isVisible);
+}
+
+function ratioPattern(ratio: string): RegExp {
+  const [rawA, rawB] = ratio.split(":");
+  const a = (rawA ?? "").trim();
+  const b = (rawB ?? "").trim();
+  if (!a || !b) return /$^/;
+  return new RegExp("\\b" + a + "\\s*[:x\\/]\\s*" + b + "\\b", "i");
+}
+
+async function chooseToggle(
+  group: HTMLElement,
+  matcher: (el: HTMLElement) => boolean,
+  label: string,
+  warnings: string[]
+): Promise<boolean> {
+  const toggle = togglesIn(group).find(matcher);
+  if (!toggle) {
+    const available = togglesIn(group)
+      .map((el) => elementText(el).replace(/\s+/g, " ").trim())
+      .join(" | ");
+    warnings.push("No " + label + " matched; available: " + (available || "none"));
+    return false;
+  }
+  const button = toggle.querySelector<HTMLElement>('button[role="radio"]') ?? toggle;
+  humanClick(button);
+  await sleep(450);
+  warnings.push("Selected " + label + ': "' + elementText(toggle).replace(/\s+/g, " ").trim().slice(0, 30) + '"');
+  return true;
+}
+
+async function chooseModel(panel: HTMLElement, model: string, warnings: string[]): Promise<boolean> {
+  const wanted = normalizeText(model);
+  const menuTrigger = deepAll<HTMLElement>('button[aria-label], .model-select-trigger-content', panel).find(
+    (el) => /nh\u00f3m m\u00f4 h\u00ecnh/i.test(el.getAttribute("aria-label") ?? "") || el.className.includes("model-select-trigger")
+  );
+  if (!menuTrigger) {
+    warnings.push("Model selector not found");
+    return false;
+  }
+  const current = normalizeText(elementText(menuTrigger));
+  if (current.includes(wanted)) {
+    warnings.push('Model already set: "' + elementText(menuTrigger).replace(/\s+/g, " ").trim().slice(0, 40) + '"');
+    return true;
+  }
+  humanClick(menuTrigger);
+  let items: HTMLElement[] = [];
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    await sleep(300);
+    items = deepAll<HTMLElement>('button[role="menuitem"], .mat-mdc-menu-item, [role="menuitem"]').filter(
+      (el) => isVisible(el) && !isDisabled(el)
+    );
+    if (items.length > 0) break;
+  }
+  const target = items.find((el) => normalizeText(elementText(el)).includes(wanted));
+  if (!target) {
+    const available = items
+      .map((el) => elementText(el).replace(/\s+/g, " ").trim())
+      .slice(0, 12)
+      .join(" | ");
+    warnings.push("No model matched; available: " + (available || "none"));
+    document.body.click();
+    await sleep(300);
+    return false;
+  }
+  humanClick(target);
+  await sleep(600);
+  warnings.push('Selected model: "' + elementText(target).replace(/\s+/g, " ").trim().slice(0, 40) + '"');
+  return true;
+}
+
+async function applySettings(request: SettingsRequest): Promise<string[]> {
+  const warnings: string[] = [];
+  const wantsModel = Boolean(request.model);
+  const wantsAspect = Boolean(request.aspectRatio);
+  const wantsCount = typeof request.count === "number" && request.count > 0;
+  if (!wantsModel && !wantsAspect && !wantsCount) return warnings;
+
+  const initial = readSettingsState(settingsTrigger());
+  warnings.push("Settings before: " + (initial.text || "unknown"));
+
+  const panel = await ensurePanel();
+  if (!panel) {
+    warnings.push("Settings panel did not open");
+    return warnings;
+  }
+
+  if (wantsModel) await chooseModel(panel, request.model as string, warnings);
+
+  if (wantsAspect) {
+    const pattern = ratioPattern(request.aspectRatio as string);
+    const group = toggleGroups(panel).find((el) => /\d+\s*:\s*\d+/.test(elementText(el)));
+    if (!group) warnings.push("Aspect ratio control not found");
+    else await chooseToggle(group, (el) => pattern.test(elementText(el)), "aspect " + request.aspectRatio, warnings);
+  }
+
+  if (wantsCount) {
+    const target = "x" + request.count;
+    const group = toggleGroups(panel).find((el) => /^x\d/i.test(normalizeText(elementText(el))));
+    if (!group) warnings.push("Count control not found");
+    else await chooseToggle(group, (el) => normalizeText(elementText(el)) === target, "count " + target, warnings);
+  }
+
+  closeSettings();
+  await sleep(350);
+  const final = readSettingsState(settingsTrigger());
+  warnings.push("Settings after: " + (final.text || "unknown"));
   return warnings;
 }
 
@@ -868,6 +1217,15 @@ async function handleRpc(method: string, params: Record<string, unknown>): Promi
         ready: !!findPromptBox(),
         hooksInstalled: state.hooksInstalled
       };
+    case "apply-settings":
+      return {
+        warnings: await applySettings({
+          model: typeof params.model === "string" ? params.model : undefined,
+          aspectRatio: typeof params.aspectRatio === "string" ? params.aspectRatio : undefined,
+          count: typeof params.count === "number" ? params.count : undefined
+        }),
+        state: readSettingsState(settingsTrigger())
+      };
     case "capture-stats":
       return {
         templates: state.templates.length,
@@ -878,7 +1236,7 @@ async function handleRpc(method: string, params: Record<string, unknown>): Promi
     case "models":
       return { models: modelsFromPage(), aspects: detectAspects() };
     case "projects":
-      return { projects: scrapeProjects(), href: location.href };
+      return collectProjects(typeof params.limit === "number" ? params.limit : 50);
     case "media":
       return { items: scrapeMedia(), pageUrl: location.href, projectId: parseProjectId(location.href) };
     case "fetch-as-dataurl": {
@@ -929,8 +1287,7 @@ async function handleRpc(method: string, params: Record<string, unknown>): Promi
         }
       }
 
-      warnings.push(...(await selectModel(model)));
-      warnings.push(...(await selectAspect(aspectRatio)));
+      warnings.push(...(await applySettings({ model, aspectRatio, count })));
 
       const box = findPromptBox();
       if (!box) throw Object.assign(new Error("Prompt box not found on the page"), { code: "E_UI_DRIFT" });
@@ -1077,11 +1434,21 @@ async function handleRpc(method: string, params: Record<string, unknown>): Promi
         lastSubmitAt: state.lastSubmitAt
       };
     case "selftest": {
+      const onProjectList = parseProjectId(location.href) === null;
+      const projects = onProjectList ? scrapeProjects() : [];
+      const cards = onProjectList ? deepAll<Element>(PROJECT_CARD_SELECTOR).length : 0;
       const checks = [
+        {
+          id: "project-list-names",
+          ok: !onProjectList || (cards > 0 && projects.length > 0 && projects.every((project) => project.name !== null)),
+          detail: onProjectList
+            ? `cards=${cards} projects=${projects.length} named=${projects.filter((project) => project.name !== null).length}; empty or unloaded lists require verification`
+            : "not applicable inside a project"
+        },
         { id: "hooks", ok: state.hooksInstalled, detail: "fetch/XHR capture hooks installed" },
-        { id: "prompt-box", ok: !!findPromptBox(), detail: "prompt input located" },
-        { id: "generate-button", ok: !!findGenerateButton(), detail: "generate button located" },
-        { id: "project-url", ok: !!parseProjectId(location.href), detail: `project id parsed from ${location.href}` },
+        { id: "prompt-box", ok: onProjectList || !!findPromptBox(), detail: onProjectList ? "not applicable on the project list" : "prompt input located" },
+        { id: "generate-button", ok: onProjectList || !!findGenerateButton(), detail: onProjectList ? "not applicable on the project list" : "generate button located" },
+        { id: "project-url", ok: onProjectList || !!parseProjectId(location.href), detail: onProjectList ? "not applicable on the project list" : `project id parsed from ${location.href}` },
         { id: "account-index", ok: parseAccountIndex(location.href) !== null, detail: "account index parsed from /u/N/" },
         {
           id: "auth-token",
@@ -1091,6 +1458,7 @@ async function handleRpc(method: string, params: Record<string, unknown>): Promi
         { id: "generate-template", ok: state.templates.length > 0, detail: `${state.templates.length} generate request template(s) captured` },
         { id: "recaptcha-sitekey", ok: state.siteKeys.length > 0, detail: `${state.siteKeys.length} reCAPTCHA site key(s) captured` },
         (() => {
+          if (onProjectList) return { id: "media-dom", ok: true, detail: "not applicable on the project list" };
           const imgs = deepAll<HTMLImageElement>("img");
           const sources = imgs.map((img) => img.currentSrc || img.src).filter(Boolean);
           const mediaish = sources.filter((src) => /flow-content|googleusercontent|getMediaUrlRedirect/i.test(src));
@@ -1114,6 +1482,9 @@ async function handleRpc(method: string, params: Record<string, unknown>): Promi
         })()
       ];
       return {
+        settings: readSettingsState(settingsTrigger()),
+        panel: onProjectList ? null : await probeSettingsPanel(),
+        composer: onProjectList ? null : await probeControls(),
         ok: checks.filter((check) => check.id !== "generate-template" && check.id !== "auth-token" && check.id !== "recaptcha-sitekey").every((check) => check.ok),
         checks,
         captured: {

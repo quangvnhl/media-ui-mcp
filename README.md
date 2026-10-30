@@ -1,8 +1,8 @@
-# media-mcp
+# media-ui-mcp
 
 MCP server + Chrome extension that lets an AI agent drive **Google Flow** (`flow.google.com`) inside the user's own signed-in Chrome session: list projects, generate images, poll results, download files to disk.
 
-> TL;DR (VI): server MCP cục bộ ↔ extension Chrome ↔ tab Flow đang đăng nhập. Agent đọc `docs/AGENT.md` để dùng, `docs/TOOLS.md` để tra tham số, `docs/TROUBLESHOOTING.md` khi lỗi.
+> In short: local MCP server ↔ Chrome extension ↔ signed-in Flow tab. Agents should read `docs/AGENT.md` for usage, `docs/TOOLS.md` for tool parameters, and `docs/TROUBLESHOOTING.md` for diagnostics.
 
 ## Why this architecture
 
@@ -26,8 +26,9 @@ npm run build
 
 1. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, select `packages/extension/dist/extension`.
 2. Pin the extension, open `https://flow.google.com` and sign in.
-3. Click the extension icon → **Pair**. It discovers the local server on ports 8765-8774 and stores the token.
-4. Register the MCP server with your client:
+3. Start one console with `npx media-ui-mcp` after npm publication, or `npm start` from this repository. Keep it open. The daemon uses only **127.0.0.1:61899**.
+4. Click the extension icon → **Pair**. It connects only to port **61899** and stores the token.
+5. Register the MCP connection with your client:
 
 ```bash
 npm run register              # prints the JSON snippet
@@ -37,7 +38,7 @@ npm run register -- --write-opencode   # writes ./opencode.json
 - opencode: the snippet goes under `mcp` in `opencode.json`, then restart opencode.
 - Claude Desktop: merge the printed `mcpServers` block into `claude_desktop_config.json`, then restart the app.
 
-The server is launched by the MCP client, not by hand. Manual runs (`npm start`) are for debugging only; logs go to stderr because stdout is the MCP wire.
+Every agent connects to the same running daemon. Stdio clients run `npx -y media-ui-mcp --stdio` (a forwarding shim, not another daemon). HTTP clients use `http://127.0.0.1:61899/mcp` with `Authorization: Bearer <token>` from `~/.media-mcp/token`. Keep secrets out of chat and logs. A second daemon detects the existing instance and exits without choosing another port. Logs go to stderr.
 
 ## Verify the install
 
@@ -56,14 +57,14 @@ Ask the agent (or run in a client) `flow_status`. A healthy setup returns:
 }
 ```
 
-If `extension` is `null`, the extension has not paired or the server port changed — reopen the popup and press **Reconnect**.
+If `extension` is `null`, check that the daemon console is open, then reopen the extension popup and press **Pair** or **Reconnect**.
 
 ## Repository layout
 
 ```
 packages/
   shared/      protocol types, zod parameter schemas, error codes, UI patterns
-  server/      stdio MCP server, loopback HTTP/WS bridge, job store
+  server/      HTTP MCP daemon, stdio forwarding shim, loopback WS bridge, job store
   extension/   MV3 extension: background worker, content scripts (MAIN + ISOLATED), popup, offscreen
 scripts/
   register-mcp.mjs   prints/writes MCP client config
@@ -90,24 +91,23 @@ Reload loop:
 | --- | --- |
 | `packages/extension/**` | `npm run build:extension`, reload the extension at `chrome://extensions`, then F5 the Flow tab |
 | `packages/extension/manifest.json` | same as above; Chrome applies new permissions only on full reload |
-| `packages/server/**` or `packages/shared/**` | `npm run build`, then restart the MCP client (opencode/Claude Desktop) |
+| `packages/server/**` or `packages/shared/**` | `npm run build`, restart the shared daemon console, reconnect MCP clients |
 
 ## Local state
 
 | Path | Purpose |
 | --- | --- |
 | `~/.media-mcp/token` | shared bridge secret (auto-generated, mode 0600) |
-| `~/.media-mcp/port` | port chosen by the server |
 | `~/.media-mcp/settings.json` | download subfolder, pinned account, spend flag |
 | `~/.media-mcp/jobs.json` | generation job history (last 200) |
 | `~/.media-mcp/discovery-capture.json` | last `flow_discovery_export` payload |
 
-Override the directory with `MEDIA_MCP_HOME`. Port with `--port` or `MEDIA_MCP_PORT`.
+Override the directory with `MEDIA_MCP_HOME`; daemon and stdio clients must use the same directory. Production always uses port **61899**. `--embed` and port overrides exist only for isolated tests.
 
 ## Known limits
 
 - `referenceImages` (image-to-image) is not implemented: returns `E_UNSUPPORTED`.
-- `count > 1` submits once; call `flow_image_generate` again for more images.
+- `count` from 1 to 4 selects the composer xN setting in one submission.
 - Project rename after creation is best-effort; Flow may keep its own prefix in the title.
 - The `strategy` field reports the lane actually used. `"dom"` means trusted CDP typing into the composer — it is fully automatic, not a manual fallback.
 - Video generation is out of scope (v1 is images + projects + download).

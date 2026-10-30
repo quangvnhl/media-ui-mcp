@@ -43,6 +43,7 @@ export class Bridge extends EventEmitter {
   private extensionVersion: string | null = null;
   private extensionId: string | null = null;
   private extensionCapabilities: Record<string, unknown> | null = null;
+  mcpHandler?: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>;
 
   constructor(
     private readonly port: number,
@@ -144,6 +145,18 @@ export class Bridge extends EventEmitter {
   }
 
   private handleHttp(req: http.IncomingMessage, res: http.ServerResponse): void {
+    if (req.url?.split("?")[0] === "/mcp" && this.mcpHandler) {
+      if (req.headers.authorization !== `Bearer ${this.token}` || req.headers.origin) {
+        res.writeHead(401).end();
+        return;
+      }
+      void this.mcpHandler(req, res).catch((error) => {
+        log.error("MCP HTTP request failed", { message: String(error) });
+        if (!res.headersSent) res.writeHead(500);
+        res.end();
+      });
+      return;
+    }
     const origin = req.headers.origin ?? "";
     const isExtension = origin.startsWith(EXTENSION_ORIGIN_PREFIX);
     res.setHeader("content-type", "application/json; charset=utf-8");
@@ -165,6 +178,7 @@ export class Bridge extends EventEmitter {
       res.writeHead(200).end(
         JSON.stringify({
           ok: true,
+          service: "media-mcp",
           port: this.port,
           protocolVersion: PROTOCOL_VERSION,
           extensionConnected: this.isConnected(),

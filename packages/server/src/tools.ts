@@ -146,7 +146,7 @@ export function registerTools(
     "flow_projects_list",
     {
       title: "List Flow projects",
-      description: "List projects visible to the pinned account, optionally filtered by account index.",
+      description: "List Flow project cards for the pinned account with their displayed titles, including user-defined and default date-based names. Waits for titles and scrolls within a bounded time. hasMore=null means completeness is unknown; do not assume a missing project does not exist. Pagination cursors are not supported.",
       inputSchema: projectsListParams.shape,
       annotations: { readOnlyHint: true }
     },

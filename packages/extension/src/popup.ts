@@ -72,23 +72,18 @@ async function refresh(): Promise<void> {
 }
 
 async function findServer(): Promise<{ port: number; token: string } | null> {
-  for (let port = DEFAULT_PORT; port < DEFAULT_PORT + 10; port += 1) {
-    try {
-      const health = await fetch(`http://127.0.0.1:${port}/health`, { cache: "no-store" });
-      if (!health.ok) continue;
-      const body = (await health.json()) as { ok?: boolean };
-      if (!body.ok) continue;
+  const port = DEFAULT_PORT;
+  try {
       const response = await fetch(`http://127.0.0.1:${port}/pair`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: "{}"
       });
-      if (!response.ok) continue;
+      if (!response.ok) return null;
       const pair = (await response.json()) as { token?: string };
       if (pair.token) return { port, token: pair.token };
-    } catch {
-      // try the next port
-    }
+  } catch {
+    return null;
   }
   return null;
 }
@@ -99,7 +94,7 @@ $("pair").addEventListener("click", async () => {
   if (!found) {
     setMessage(
       pairMsg,
-      "No MCP server found on ports 8765-8774. Start the server (it is launched by your AI client) and try again.",
+      `No MCP server found on port ${DEFAULT_PORT}. Run npx media-ui-mcp in a console and try again.`,
       "error"
     );
     return;

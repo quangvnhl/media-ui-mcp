@@ -1,22 +1,30 @@
 {
-  "name": "@media-mcp/server",
-  "version": "0.1.0",
-  "private": true,
+  "name": "media-ui-mcp",
+  "version": "0.2.1",
+  "description": "Shared local MCP daemon and Chrome bridge for Google Flow",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/quangvnhl/media-ui-mcp.git", "directory": "packages/server" },
+  "homepage": "https://github.com/quangvnhl/media-ui-mcp#readme",
+  "bugs": { "url": "https://github.com/quangvnhl/media-ui-mcp/issues" },
+  "files": ["dist/index.js", "README.md", "LICENSE"],
+  "engines": { "node": ">=20.11" },
+  "publishConfig": { "access": "public" },
   "type": "module",
   "bin": {
-    "media-mcp": "./dist/index.js"
+    "media-ui-mcp": "dist/index.js"
   },
   "scripts": {
     "build": "node ./build.mjs",
     "dev": "node ./build.mjs --watch",
     "test": "node --test test/*.test.ts",
     "start": "node ./dist/index.js",
-    "pretest": "npm run build"
+    "pretest": "npm run build",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@media-mcp/shared": "*",
     "@modelcontextprotocol/sdk": "^1.17.0",
     "ws": "^8.18.0",
     "zod": "^3.24.1"
-  }
+  },
+  "devDependencies": { "@media-mcp/shared": "*" }
 }
